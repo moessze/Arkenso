@@ -1,4 +1,3 @@
-// hotelmenu.js
 const fs = require('fs')
 
 exports.run = {
@@ -15,13 +14,13 @@ exports.run = {
     plugins
   }) => {
     try {
-      // Init storage (jangan menimpa data lama)
+      // init
       global.db = global.db || {}
       global.db.contacts = Array.isArray(global.db.contacts) ? global.db.contacts : []
       global.db.setting = global.db.setting || {}
       global.db.setting.message = Array.isArray(global.db.setting.message) ? global.db.setting.message : []
 
-      // ===== Build messageHeader (back-compatible) =====
+      // header (compat)
       const local_size = fs.existsSync('./' + env.database + '.json')
         ? await Func.getSize(fs.statSync('./' + env.database + '.json').size)
         : ''
@@ -52,12 +51,10 @@ exports.run = {
         .replace('+module', moduleName)
         .replace('+version', versionName)
 
-      // Cover untuk menu utama saja (tidak dipakai di reply teks)
       const coverMedia = Func.isUrl(setting.cover)
         ? setting.cover
         : (setting.cover ? Buffer.from(setting.cover, 'base64') : null)
 
-      // ===== Konten teks untuk Reception (View Services) =====
       const receptionText =
 `📞 *Reception Services*
 
@@ -72,7 +69,7 @@ Dial '0' from your room phone.`
 
       const q = (text || '').trim().toLowerCase()
 
-      // Quick Reply → kirim kontak Reception (tetap sama)
+      // Quick Reply → kirim kontak Reception
       if (q === 'reception_contact') {
         return client.sendContact(m.chat, [{
           name: 'Reception',
@@ -85,13 +82,12 @@ Dial '0' from your room phone.`
         })
       }
 
-      // View Services → Reception Services => kirim TEKS via chat reply (tanpa gambar/link)
+      // View Services → Reception (kirim teks via reply, tanpa gambar/link)
       if (q === 'reception') {
-        const body = Func.Styles(receptionText)
-        return client.reply(m.chat, body, m) // <= reply sederhana
+        return client.reply(m.chat, receptionText, m)
       }
 
-      // View Services → kontak dinamis (tetap kirim kontak)
+      // View Services → kontak dinamis (kirim kontak)
       if (q.startsWith('contact:')) {
         const number = q.replace('contact:', '').replace(/\D+/g, '')
         const found = global.db.contacts.find(x => (x.number || '') === number)
@@ -107,48 +103,46 @@ Dial '0' from your room phone.`
         })
       }
 
-      // View Services → pesan dinamis (kirim TEKS via chat reply, tanpa gambar/link)
+      // View Services → pesan dinamis (KIRIM TEKS BIASA — TANPA Func.Styles, TANPA bold)
       if (q.startsWith('messagei:')) {
         const idx = parseInt(q.slice('messagei:'.length), 10)
         if (isNaN(idx) || idx < 0 || idx >= global.db.setting.message.length) {
           return m.reply(`Pesan tidak ditemukan.`)
         }
         const item = global.db.setting.message[idx]
-        const body = Func.Styles(item.text || '')
-        return client.reply(m.chat, body, m) // <= reply sederhana
+        return client.reply(m.chat, String(item.text || ''), m) // teks apa adanya
       }
 
-      // ===== Build menu (IA message): Reception (teks), kontak (kirim contact), pesan (kirim teks)
+      // Build menu (IA message)
       const rows = [{
         title: 'Reception Services',
         description: 'Front desk services and assistance',
-        id: `${isPrefix}${command} reception` // kirim teks via reply
+        id: `${isPrefix}${command} reception`
       }]
 
-      // Kontak → tampil NAMA SAJA
+      // kontak (judul hanya nama)
       for (const c of global.db.contacts) {
         if (!c || !c.number) continue
         rows.push({
           title: (c.name || 'Contact').trim(),
           description: 'Send contact',
-          id: `${isPrefix}${command} contact:${c.number}` // kirim kontak
+          id: `${isPrefix}${command} contact:${c.number}`
         })
       }
 
-      // Pesan → tampil NAMA SAJA
+      // pesan (judul hanya nama)
       for (let i = 0; i < global.db.setting.message.length; i++) {
         const item = global.db.setting.message[i]
         rows.push({
           title: (item?.name || 'Message').trim(),
           description: 'View message',
-          id: `${isPrefix}${command} messagei:${i}` // kirim teks via reply
+          id: `${isPrefix}${command} messagei:${i}`
         })
       }
 
       const sections = [{ title: 'Hotel Services Menu', rows }]
       const buttons = [
         {
-          // Quick Reply: kirim KONTAK Reception langsung
           name: 'quick_reply',
           buttonParamsJson: JSON.stringify({
             display_text: 'Reception Services',
@@ -156,7 +150,6 @@ Dial '0' from your room phone.`
           })
         },
         {
-          // View Services: Reception (teks), daftar kontak (kirim kontak), daftar pesan (kirim teks)
           name: 'single_select',
           buttonParamsJson: JSON.stringify({
             title: 'View Services',
@@ -165,7 +158,6 @@ Dial '0' from your room phone.`
         }
       ]
 
-      // IA menu utama tetap pakai header; media tetap boleh (tidak diminta dihapus)
       client.sendIAMessage(m.chat, buttons, m, {
         header: 'Grand Luxury Hotel',
         content: `${messageHeader}\n\nPlease select an option below:`,
