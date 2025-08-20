@@ -7,11 +7,6 @@ exports.run = {
   category: 'miscs',
   async: async (m, { client, text, isPrefix, command, Func, env }) => {
     try {
-      // admin / owner check via env.owner
-      const OWNERS = toArray(env?.owner).map(digits)
-      const isOwner = OWNERS.includes(digits(m.sender))
-      if (!isOwner) return m.reply('Fitur ini khusus owner.')
-
       // init db
       global.db = global.db || {}
       global.db.setting = global.db.setting || {}
@@ -74,5 +69,6 @@ exports.run = {
   },
   error: false,
   cache: true,
+  owner: true,
   location: __filename
 }
